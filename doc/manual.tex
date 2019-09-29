@@ -1,0 +1,141 @@
+% ISA
+% Projekt
+% Juraj Holub
+% xholub40@stud.fit.vutbr.cz
+
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[czech]{babel}
+\usepackage[IL2]{fontenc}
+\usepackage{times}
+\usepackage[left=1.5cm,top=2.5cm,text={18cm,25cm}]{geometry}
+\usepackage[unicode]{hyperref}
+\usepackage{amsmath, amsthm, amsfonts, amssymb}
+\usepackage{dsfont}
+\setlength{\parindent}{1em}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{listings}
+\usepackage{cite}
+
+%\date{}
+
+\lstset{
+	basicstyle=\small\ttfamily,
+}
+
+\begin{document}
+\begin{titlepage}
+	\begin{center}
+		\Huge
+		\textsc{Fakulta informačních technologií \\
+			Vysoké učení technické v~Brně} \\
+		\vspace{\stretch{0.382}}
+		{\LARGE
+			ISA - Síťové aplikace a správa sítí \\ 
+			\medskip \Large{Manuál k projektu 
+				Programování síťové služby}
+			\vspace{\stretch{0.618}}}
+	\end{center}
+		\setlength{\parindent}{0.3em}
+		{\Large 2019 \hfill
+			Juraj Holub (xholub40)}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Úvod}
+Port scan aplikácia je program, ktorý posiela klientské dotazy na rôzne porty hostujúceho serveru s cieľom nájsť aktívne porty. Takýto tip aplikácie môžu využívať administrátory s cieľom preverenia bezpečnosti ich siete. Predovšetkým je však tento tip aplikácie využívaný útočníkmi pre identifikovanie sieťovej služby a zistenie jej zraniteľnosti. Existuje veľa rôznych techník skenovania portov. Medzi najznámejšie patrí TCP SYN scan, TCP connect scan, UDP scan, SCTP INIT scan alebo napríklad TCP ACK scan. Táto aplikácia implementuje dve najznámejšie techniky: TCP SYN scan a UDP scan.
+%https://tools.ietf.org/html/rfc2828#section-3
+\cite{rfc_2828}
+\section{Architektúra aplikácie}
+\begin{wrapfigure}{r}{0.3\textwidth}
+	\centering
+	\includegraphics[width=.25 \paperwidth]{app_inheritance.pdf}
+	\caption{Scheme implemntácie aplikácie.}
+	\label{obr1}
+\end{wrapfigure} 
+ Program je implementovaný v jazyku C++11, využíva systémové knihovny pre vytváranie  \href{http://pubs.opengroup.org/onlinepubs/007908775/xns/syssocket.h.html}{BSD socketov} a prijíma odpovede pomocou knihovny \href{https://www.tcpdump.org/}{libpcap} . Program implementuje dve techniky skenovania, ktoré sa predovšetým líšia v transportnej vrstve. Objektová implementácia aplikácie je preto rozdelena na tri hlavné triedy:
+ \begin{itemize}
+ 	\item \textbf{TCP Scanner}: Vytvorí a vyplní transportnú vrstvu TCP SYN raw packetom. Tento tip TCP packetu sa používa pre zahájenie spojenia pomocou 3-way handshaku. %https://study-ccna.com/tcp-three-way-handshake/
+ 	 Následne sa zaháji spojenie zo skenovaným portom a na základe odpovede sa vyhodnocuje stav tohoto portu (viď. sekcia \ref{sec_tcp_scanner}).
+ 	\item \textbf{UDP Scanner}: Vytvorí a vyplní transportnú vrstvu UDP obálkov a pošle daný packet na skenovaný port. Následne sa čaká na odpoveď (viď. sekcia \ref{sec_udp_scanner}).
+ 	\item \textbf{Scanner}: Oba tipy packetov používajú rovnakú sieťovú vrstvu, preto implementácia vytvárania IPv4 hlavičky zdieľajú obe podtriedy. Táto rodičovská trieda taktiež implementuje ďalšiu spoločnú funkcionalitu ako je výpočet kontrolného súčtu alebo získavanie vhodného rozhrania a IP adresy zariadenia na ktorom program beží.
+ \end{itemize}
+
+\section{TCP skenovanie}\label{sec_tcp_scanner}
+%https://nmap.org/book/synscan.html
+TCP SYN scan je najznámejší a najpopulárnejší spôsob skenovania portov. Ide o veľmy rýchly spôsob skenovania (nástroj \href{https://nmap.org/book/synscan.html}{nmap} tvrdí, že dokáže skenovať rádovo tisícky portov za sekundu). Princíp skenovania využíva TCP 3-way-handshake pri naviazaní spojenia. Na začiatku klient zašle TCP packet z nastaveným SYN príznakom. \cite{nmap_book} Na základe odpovede serveru môžeme port označiť ako:
+\begin{itemize}
+	\item \textbf{Otvorený} v prípade, že server zašle späť TCP packet s nastavenými príznakmi SYN a ACK.
+	\item \textbf{Zatvorený} v prípade, že server zašle späť TCP packet s nastaveným príznakom RST.
+	\item \textbf{Filtrovaný} ak odpoveď zo serveru nepríde. V takomto prípade sa skúsi ešte raz zaslať SYN packet.
+\end{itemize}
+\begin{figure}[H] 
+\centering
+\includegraphics[width=.8 \paperwidth]{tcp_scanning.pdf}
+\caption{Princíp vyhodnotenia TCP SYN packet skenovania.}
+\label{obr1}
+\end{figure} 
+
+Implementovaný TCP scanner vytvára a zasiela SYN packet pomocou BSD socket knihovny a na odpoveď serveru využíva libpcap knihovnu. Libpcap knihovna umožnuje vytvorenie filtru, ktorý prijíma packety len z predom definovaného portu a IP adresy. Taktiež umožnuje nastavenie maximálnej doby čakania na packet čo je využívané pre rozpoznanie situácie, že packet sa stratil (bol odfiltorvaný sieťov).
+
+\section{UDP skenovanie}\label{sec_udp_scanner}
+Na rozdiel od TCP SYN skenovania je UDP skenovanie portov všeobecne pomalšie a zložitejšie. UDP protokol nevytvára spojenie (connection-less). Otvorené porty potom nezasielajú spätnú informáciu na náš packet a ani zatvorené porty nemusia zasielať error packet. Avšak ak je packet zaslaný na zavrený port, tak väčšina hostov zasiela ICMP packet typu 3 s kódom 3 (Port unreachable). \cite{nmap_book} Na základe tejto znalosti vyhodnocujeme skenované porty následovne:
+\begin{itemize}
+	\item \textbf{Zatvorený} ak na náš UDP packet odpovedal host ICMP port unreachable packetom.
+	\item \textbf{Otvorený} v opačnom prípade ale keďže nemáme žiadnu informáciu o tom či sa ICMP packet nestratil, tak skenovanie opakujeme viackrát.
+\end{itemize}
+\section{Testovanie}
+Pre testovanie bola ako referenčný nástroj použitá open source utilita \href{https://nmap.org/}{\textbf{nmap}} . Pre overenie správnosti zasielaných packetov sa využil analyzátor sieťových protokolov \href{https://www.wireshark.org/}{\textbf{wireshark}} . Príklad \ref{listing_nmap} ukazuje referenčný sken zvolených portov pomocou utility nmap. Naopak príklad \ref{listing_my_app} ukazuje sken portov pomocou tejto aplikácie. Výsledky skenovania sú zhodné s výsledkamy skenovania pomocou referenčného naśtroja nmap.
+
+\begin{lstlisting}[caption={Príklad skenovania pomocou utility nmap.}, label={listing_nmap}]
+user@pc:~$ sudo nmap -sU -sS -p25,80 localhost
+
+Starting Nmap 7.60 ( https://nmap.org ) at 2019-04-12 14:01 CEST
+Nmap scan report for localhost (127.0.0.1)
+Host is up (0.000026s latency).
+
+PORT   STATE  SERVICE
+25/tcp closed smtp
+80/tcp open   http
+25/udp closed smtp
+80/udp closed http
+
+Nmap done: 1 IP address (1 host up) scanned in 0.54 seconds
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Príklad skenovania portov touto aplikáciou.}, label={listing_my_app}]
+user@pc:~$ sudo ./ipk-scan -pt 25,80 -pu 25,80 localhost
+PORT                STATE
+25/tcp              closed
+80/tcp              open
+25/udp              closed
+80/udp              closed
+\end{lstlisting}
+
+Obrázok \ref{obr_tcp_syn} zobrazuje packety zasielané medzi klientom (port scanner) a skenovaným portom v prípade TCP SYN skenovania. Skenovaný port na SYN packet odpovedal TCP packetom s nastavenými príznakmy SYN a ACK a teda ho považujeme za otovorený.
+\begin{figure}[H] 
+	\centering
+	\includegraphics[width=.8 \paperwidth]{tcp_syn.png}
+	\caption{TCP SYN scan portu 80.}
+	\label{obr1}
+\end{figure} \label{obr_tcp_syn}
+
+Na obrázoku \ref{obr_udp_scan} je výsledok skenovania pomocou UDP packetu. Host zaslal ako odpoveď ICMP packet typu 3 s kódom 3 (Port unreachable) a preto port považujeme za zatvorený. V prípade, že by nebola žiadna ICMP zpráva prijatá, opakovalo by sa zaslanie UDP packetu ešte niekoľkokrát (implementovaná aplikácia by prípadne poslala požiadavok celkom 3-krát) a ak by nedošlo k ICMP odpovedi, port by sa označil za otvorený.
+
+\begin{figure}[H] 
+	\centering
+	\includegraphics[width=.8 \paperwidth]{udp_scan.png}
+	\caption{UDP scan portu 80 a následná odpoveď ICMP packetom (Port unreachable).}
+	\label{obr1}
+\end{figure} \label{obr_udp_scan}
+
+\newpage
+\bibliographystyle{czechiso}
+\bibliography{bib}
+
+\end{document}
