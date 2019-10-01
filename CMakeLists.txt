@@ -9,8 +9,9 @@ include(FindBIND.cmake)
 
 add_executable( project main.cpp
         tcp_socket.h tcp_socket.cpp
-        udp_socket.h udp_socket.cpp
         dns_query.h dns_query.cpp
+        whois_deparser.h whois_deparser.cpp
+        argument_parser.h argument_parser.cpp
         )
 
 target_link_libraries(project ${BIND_LIBRARY})

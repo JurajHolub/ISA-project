@@ -7,26 +7,30 @@
 
 
 #include "tcp_socket.h"
-#include "udp_socket.h"
 #include "dns_query.h"
+#include "whois_deparser.h"
+#include "argument_parser.h"
 
-int main()
+int main(int argc, char **argv)
 {
-	DnsQuery dnsQuery;
-	dnsQuery.foo();
+	ArgumentParser argumentParser;
+	if (!argumentParser.parseArgs(argc, argv))
+	{
+		return EXIT_FAILURE;
+	}
 
 	try {
-	/*
+		DnsQuery dnsQuery(argumentParser.getDnsServer());
+		dnsQuery.askServer(argumentParser.getHostname());
+
 		TcpSocket tcpSocket;
-		tcpSocket.connectServer("whois.ripe.net", 43);
-		tcpSocket.sendData("-B 147.229.2.90\r\n");
-		std::cout << tcpSocket.recvData() << std::endl;
+		tcpSocket.connectServer(argumentParser.getWhoisServer(), 43);
+		tcpSocket.sendData("-B "+ argumentParser.getHostname() +"\r\n");
+		std::string data = tcpSocket.recvData();
 		tcpSocket.closeConnection();
-		UdpSocket udpSocket;
-		udpSocket.createSocket(getDnsServer(), 53);
-		udpSocket.sendData("");
-		std::cout << udpSocket.recvData() << std::endl;
-	*/
+
+		WhoisDeparser whoisDeparser = WhoisDeparser(data);
+		whoisDeparser.printDeparsedData();
 	}
 	catch (std::runtime_error &e) {
 		e.what();

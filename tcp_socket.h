@@ -1,6 +1,9 @@
-//
-// Created by juraj on 30/09/2019.
-//
+/**
+ * @file tcp_socket.h
+ * @author Juraj Holub <xholub40@stud.fit.vutbr.cz>
+ * @brief Create send and recieve tcp sockets.
+ * @date October 2019
+ */
 
 #ifndef PROJECT_TCP_SOCKET_H
 #define PROJECT_TCP_SOCKET_H
