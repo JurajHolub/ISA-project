@@ -3,8 +3,9 @@
 # @date 2019
 
 CC = g++
-CFLAGS = -I -g -lpcap
-OBJ = main.o
+CFLAGS = -I -g -lresolv
+OBJ = main.o \
+	  dns_query.o
 EXECUTABLE = isa-tazatel
 
 all: $(EXECUTABLE)

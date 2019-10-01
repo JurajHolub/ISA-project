@@ -5,10 +5,33 @@
  * @date October 2019
  */
 
-#include <iostream>
+
+#include "tcp_socket.h"
+#include "udp_socket.h"
+#include "dns_query.h"
 
 int main()
 {
-	std::cout << "Hello, World!" << std::endl;
-	return 0;
+	DnsQuery dnsQuery;
+	dnsQuery.foo();
+
+	try {
+	/*
+		TcpSocket tcpSocket;
+		tcpSocket.connectServer("whois.ripe.net", 43);
+		tcpSocket.sendData("-B 147.229.2.90\r\n");
+		std::cout << tcpSocket.recvData() << std::endl;
+		tcpSocket.closeConnection();
+		UdpSocket udpSocket;
+		udpSocket.createSocket(getDnsServer(), 53);
+		udpSocket.sendData("");
+		std::cout << udpSocket.recvData() << std::endl;
+	*/
+	}
+	catch (std::runtime_error &e) {
+		e.what();
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
 }
