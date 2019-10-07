@@ -11,21 +11,27 @@
 #include <iostream>
 #include <resolv.h>
 #include <vector>
+#include "argument_parser.h"
 
 class DnsQuery {
 public:
-	DnsQuery(std::string dnsServer);
-	void askServer(std::string analyzedDomain);
-	void findDnsServer();
-	void printResultOFDnsQueries(int i, ns_rr rr, ns_msg handle);
+	DnsQuery(address_t dnsServer, address_t analyzedDomain);
+	void askServer();
+	void printResultOFDnsQueries(
+		std::pair<__ns_type, std::string> queryType,
+		ns_rr parsedRecord,
+		ns_msg messageHandler);
 
 private:
 	union {
 		HEADER header;
 		u_char buffer[NS_PACKETSZ];
 	} query, answer;
-	std::string dnsServer;
-	struct hostent* server;
+
+	address_t dnsServer;
+	address_t analyzedDomain;
+
+	struct hostent* server, *domain;
 	int queryLength, answerLength;
 	const std::vector<std::pair<__ns_type, std::string>> queryType = {
 		{ns_t_aaaa, "AAAA:"},

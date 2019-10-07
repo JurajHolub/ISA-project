@@ -6,9 +6,8 @@
  */
 
 
-#include "tcp_socket.h"
 #include "dns_query.h"
-#include "whois_deparser.h"
+#include "whois_query.h"
 #include "argument_parser.h"
 
 int main(int argc, char **argv)
@@ -16,24 +15,21 @@ int main(int argc, char **argv)
 	ArgumentParser argumentParser;
 	if (!argumentParser.parseArgs(argc, argv))
 	{
-		return EXIT_FAILURE;
+		argumentParser.printHelp();
+		return EXIT_SUCCESS;
 	}
+
+	std::cout << "Analyzed domain: " << argumentParser.getAnalyzedDomain().hostname << std::endl;
+
+	DnsQuery dnsQuery(argumentParser.getDnsServer(), argumentParser.getAnalyzedDomain());
+	WhoisQuery whoisQuery(argumentParser.getWhoisServer(), argumentParser.getAnalyzedDomain());
 
 	try {
-		DnsQuery dnsQuery(argumentParser.getDnsServer());
-		dnsQuery.askServer(argumentParser.getHostname());
-
-		TcpSocket tcpSocket;
-		tcpSocket.connectServer(argumentParser.getWhoisServer(), 43);
-		tcpSocket.sendData("-B "+ argumentParser.getHostname() +"\r\n");
-		std::string data = tcpSocket.recvData();
-		tcpSocket.closeConnection();
-
-		WhoisDeparser whoisDeparser = WhoisDeparser(data);
-		whoisDeparser.printDeparsedData();
+		dnsQuery.askServer();
+		whoisQuery.askServer();
 	}
-	catch (std::runtime_error &e) {
-		e.what();
+	catch (std::runtime_error e) {
+		std::cerr << e.what() << std::endl;
 		return EXIT_FAILURE;
 	}
 

@@ -15,43 +15,36 @@
 #include <arpa/nameser.h>
 #include <cstdio>
 
-DnsQuery::DnsQuery(std::string dnsServer)
+DnsQuery::DnsQuery(address_t dnsServer, address_t analyzedDomain)
 {
 	this->dnsServer = dnsServer;
-}
-
-void DnsQuery::findDnsServer()
-{
-	char stringIp[INET_ADDRSTRLEN];
-	bzero(stringIp, INET_ADDRSTRLEN);
-	sockaddr_in dnsServerAddr = _res.nsaddr_list[0];
-	inet_ntop(AF_INET, &dnsServerAddr.sin_addr, stringIp, INET_ADDRSTRLEN);
-	dnsServer = stringIp;
+	this->analyzedDomain = analyzedDomain;
 }
 
 //https://docstore.mik.ua/orelly/networking_2ndEd/dns/ch15_02.htm
 //https://git.busybox.net/busybox/plain/networking/nslookup.c
-void DnsQuery::askServer(std::string analyzedDomain)
+void DnsQuery::askServer()
 {
 	std::cout << "=== DNS ===\n";
+
 	res_init();
-	//findDnsServer();
 	_res.options &= ~(RES_DNSRCH | RES_DEFNAMES);
 	_res.options |= RES_RECURSE;
 	_res.retry = 2;
 	_res.nscount = 1;
 
-	if (!(server = gethostbyname(dnsServer.c_str())))
+	if (!(server = gethostbyname(dnsServer.ipv4.c_str())))
 	{
 		throw std::runtime_error("error: gethostbyname");
 	}
 	memcpy(&_res.nsaddr_list[0].sin_addr, server->h_addr_list[0], server->h_length);
 
+	ns_msg messageHandler;
 	for (int i = 0; i < queryType.size(); ++i)
 	{
 		queryLength = res_mkquery(
 			ns_o_query,
-			analyzedDomain.c_str(),
+			analyzedDomain.hostname.c_str(),
 			ns_c_in,
 			queryType.at(i).first,
 			NULL,
@@ -66,79 +59,87 @@ void DnsQuery::askServer(std::string analyzedDomain)
 			throw std::runtime_error("error: res_send");
 		}
 
-		ns_msg handle;
-		if ((ns_initparse(answer.buffer, answerLength, &handle)) < 0)
+		if ((ns_initparse(answer.buffer, answerLength, &messageHandler)) < 0)
 		{
 			throw std::runtime_error("error: ns_initparse");
 		}
-		if (ns_msg_getflag(handle, ns_f_rcode) != ns_r_noerror)
+		if (ns_msg_getflag(messageHandler, ns_f_rcode) != ns_r_noerror)
 		{
-			throw std::runtime_error("error: ns_initparse");
+			continue; // dns reply -> field not found -> skip
 		}
-		for (int j = 0; j < ns_msg_count(handle, ns_s_an); ++j)
+		ns_rr parsedRecord;
+		for (int j = 0; j < ns_msg_count(messageHandler, ns_s_an); ++j)
 		{
-			ns_rr rr;
-			if (ns_parserr(&handle, ns_s_an, j, &rr))
+			if (ns_parserr(&messageHandler, ns_s_an, j, &parsedRecord))
 			{
 				throw std::runtime_error("error: ns_parserr");
 			}
-			if (ns_rr_type(rr) != queryType.at(i).first)
+			if (ns_rr_type(parsedRecord) != queryType.at(i).first)
 			{
 				throw std::runtime_error("error: Did not recieve " + queryType.at(i).second);
 			}
-			printResultOFDnsQueries(i, rr, handle);
+			printResultOFDnsQueries(queryType.at(i), parsedRecord, messageHandler);
 		}
 	}
 }
 
-void DnsQuery::printResultOFDnsQueries(int i, ns_rr rr, ns_msg handle)
+// https://git.busybox.net/busybox/plain/networking/nslookup.c
+void DnsQuery::printResultOFDnsQueries(
+	std::pair<__ns_type, std::string> queryType,
+	ns_rr parsedRecord,
+	ns_msg messageHandler)
 {
-	auto cp = (u_char*)ns_rr_rdata(rr);
-	char dname[MAXDNAME];
-	char addrStr[INET6_ADDRSTRLEN];
+	u_char *dataPtr = (u_char *) ns_rr_rdata(parsedRecord);
+	u_char *dataBegin = (u_char *)ns_msg_base(messageHandler);
+	u_char *dataEnd = (u_char*) ns_msg_end(messageHandler);
+	char domain[MAXDNAME];
+	char ipAddr[INET6_ADDRSTRLEN];
 	int n;
 
 	std::string result;
-	switch (queryType.at(i).first)
+	switch (queryType.first)
 	{
 		case ns_t_aaaa:
-			inet_ntop(AF_INET6, cp, addrStr, sizeof(addrStr));
-			result = addrStr;
+			inet_ntop(AF_INET6, dataPtr, ipAddr, INET6_ADDRSTRLEN);
+			result = ipAddr;
 			break;
 		case ns_t_a:
-			inet_ntop(AF_INET, cp, addrStr, sizeof(addrStr));
-			result = addrStr;
+			inet_ntop(AF_INET, dataPtr, ipAddr, INET_ADDRSTRLEN);
+			result = ipAddr;
 			break;
 		case ns_t_soa:
-			n = ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle), cp, dname, sizeof(dname));
-			result += "origin " + std::string(dname) + "\n\t\t\t\t";
-			n = ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle), (cp += n), dname, sizeof(dname));
-			result += "email " + std::string(dname) + "\n\t\t\t\t";
-			result += "serial " + std::to_string(ns_get32(cp += n)) + "\n\t\t\t\t";
-			result += "refresh " + std::to_string(ns_get32(cp += 4)) + "\n\t\t\t\t";
-			result += "retry " + std::to_string(ns_get32(cp += 4)) + "\n\t\t\t\t";
-			result += "expire " + std::to_string(ns_get32(cp += 4)) + "\n\t\t\t\t";
-			result += "minimum " + std::to_string(ns_get32(cp)) + "\n";
+			n = ns_name_uncompress(dataBegin, dataEnd, dataPtr, domain, MAXDNAME);
+			result = "origin " + std::string(domain) + "\n";
+			n = ns_name_uncompress(dataBegin, dataEnd, (dataPtr += n), domain, MAXDNAME);
+			result += "SOA:\t\t\temail "   + std::string(domain) + "\n";
+			result += "SOA:\t\t\tserial "  + std::to_string(ns_get32(dataPtr += n)) + "\n";
+			result += "SOA:\t\t\trefresh " + std::to_string(ns_get32(dataPtr += 4)) + "\n";
+			result += "SOA:\t\t\tretry "   + std::to_string(ns_get32(dataPtr += 4)) + "\n";
+			result += "SOA:\t\t\texpire "  + std::to_string(ns_get32(dataPtr += 4)) + "\n";
+			result += "SOA:\t\t\tminimum " + std::to_string(ns_get32(dataPtr));
 			break;
 		case ns_t_ns:
 		case ns_t_cname:
 		case ns_t_ptr:
-			ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle), cp, dname, sizeof(dname));
-			result = dname;
+			ns_name_uncompress(dataBegin, dataEnd, dataPtr, domain, MAXDNAME);
+			result = domain;
 			break;
 		case ns_t_txt:
-			bzero(dname, sizeof(dname));
-			memcpy(dname, cp+1, *cp);
-			result = "\"" + std::string(dname) + "\"";
+			bzero(domain, MAXDNAME);
+			memcpy(domain, dataPtr + 1, *dataPtr);
+			result = "\"" + std::string(domain) + "\"";
 			break;
 		case ns_t_mx:
-			u_int32_t mx = ns_get16(cp);
-			ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle), cp + 2, dname, sizeof(dname));
-			result = std::to_string(mx) + " " + dname;
+			u_int32_t mx = ns_get16(dataPtr);
+			ns_name_uncompress(dataBegin, dataEnd, dataPtr + 2, domain, MAXDNAME);
+			result = std::to_string(mx) + " " + domain;
 			break;
 	}
 	if (!result.empty())
 	{
-		printf("%-15s %s\n", queryType.at(i).second.c_str(), result.c_str());
+		printf("%-15s %s\n", queryType.second.c_str(), result.c_str());
+	} else
+	{
+		std::cout << "no entries found\n";
 	}
 }

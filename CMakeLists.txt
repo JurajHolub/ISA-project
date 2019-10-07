@@ -10,7 +10,7 @@ include(FindBIND.cmake)
 add_executable( project main.cpp
         tcp_socket.h tcp_socket.cpp
         dns_query.h dns_query.cpp
-        whois_deparser.h whois_deparser.cpp
+        whois_query.h whois_query.cpp
         argument_parser.h argument_parser.cpp
         )
 

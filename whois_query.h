@@ -5,18 +5,22 @@
  * @date October 2019
  */
 
-#ifndef PROJECT_WHOIS_DEPARSER_H
-#define PROJECT_WHOIS_DEPARSER_H
+#ifndef PROJECT_WHOIS_QUERY_H
+#define PROJECT_WHOIS_QUERY_H
 
 #include <iostream>
 #include <vector>
+#include "argument_parser.h"
 
-class WhoisDeparser {
+class WhoisQuery {
 public:
-	WhoisDeparser(std::string data);
+	WhoisQuery(address_t whoisServer, address_t analyzedDomain);
 	void printDeparsedData();
+	void askServer();
 
 private:
+	address_t whoisServer;
+	address_t analyzedDomain;
 	std::string rawData;
 	std::string parsedData;
 	const std::vector<std::string> objects = {
@@ -31,4 +35,4 @@ private:
 };
 
 
-#endif //PROJECT_WHOIS_DEPARSER_H
+#endif //PROJECT_WHOIS_QUERY_H

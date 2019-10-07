@@ -11,9 +11,9 @@
 #include <iostream>
 
 class TcpSocket {
-
 public:
-	void connectServer(std::string serverHostName, int serverPort);
+
+	void connectServer(std::string server, int serverPort);
 	void sendData(std::string data);
 	std::string recvData();
 	void closeConnection();

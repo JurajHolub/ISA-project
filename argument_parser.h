@@ -13,20 +13,35 @@
 #define WHOISE_SERVVER 0
 #define HOSTNAME 1
 #define DNS_SERVER 2
+#define HELP_MSG 3
+
+struct address_t {
+	std::string hostname;
+	std::string ipv4;
+};
 
 class ArgumentParser {
 public:
+
 	ArgumentParser();
 	bool parseArgs(int argc, char **argv);
+	void printHelp();
 
-	std::string getWhoisServer();
-	std::string getHostname();
-	std::string getDnsServer();
+	address_t getWhoisServer();
+	address_t getAnalyzedDomain();
+	address_t getDnsServer();
+	/**
+	 * If input is IPV4 then find domain name.
+	 * If input is domain name then find IPv4 address.
+	 * If input is IPv6 then find domain name and by domain name find ipv4.
+	 * Else dont fill ipv4 and domain and DNS or Whois server didnt found content (user input error).
+	 */
+	address_t parseDomain(std::string input);
 
 private:
-	std::string whoisServer;
-	std::string hostName;
-	std::string dnsServer;
+	address_t whoisServer;
+	address_t analyzedDomain;
+	address_t dnsServer;
 };
 
 

@@ -21,7 +21,7 @@ void TcpSocket::connectServer(std::string serverHostName, int serverPort)
 	struct hostent* server;
 	if (!(server = gethostbyname(serverHostName.c_str())))
 	{
-		throw std::runtime_error("error: gethostbyname(\"" + serverHostName + "\")");
+		throw std::runtime_error("error: Can not create TCP connection to WHOIS server!");
 	}
 
 	//init server addr
@@ -33,7 +33,7 @@ void TcpSocket::connectServer(std::string serverHostName, int serverPort)
 
 	if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0)
 	{
-		throw std::runtime_error("error: inet_pton");
+		throw std::runtime_error("error: Can not create TCP connection to WHOIS server!");
 	}
 	server_addr.sin_port = htons(serverPort);
 
@@ -41,13 +41,13 @@ void TcpSocket::connectServer(std::string serverHostName, int serverPort)
 	if ((socket_id = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) <= 0)
 	{
 		close(socket_id);
-		throw std::runtime_error("error: socket(TCP)");
+		throw std::runtime_error("error: Can not create TCP connection to WHOIS server!");
 	}
 
 	if (connect(socket_id, (const struct sockaddr*) &server_addr, sizeof(server_addr)) < 0)
 	{
 		close(socket_id);
-		throw std::runtime_error("error: connect(TCP)");
+		throw std::runtime_error("error: Can not create TCP connection to WHOIS server!");
 	}
 }
 
@@ -66,7 +66,8 @@ std::string TcpSocket::recvData()
 	unsigned size = 4096;
 	char tmp[size];
 
-	while (recv(socket_id, tmp, size, 0) > 0)
+	int err;
+	while ((err=recv(socket_id, tmp, size, 0)) > 0)
 	{
 		data += tmp;
 		bzero(tmp, size);
