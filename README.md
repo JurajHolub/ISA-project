@@ -15,13 +15,12 @@ Native environment OS GNU/Linux (Windows not tested).
 - ``./isa-tazatel -h`` - dump usage information.
 ## Usage
 ``isa-tazatel <arguments>``
-Compulsory arguments:
-``  -q <IP|hostname>  = IP or hostname address to by analyzed.
-  -w <IP|hostname>  = IP or hostname of questioned WHOIS server``
-Optional arguments:
-``  -d <IP|hostname>  = IP or hostanme of questioned DNS server
-                     (default value "1.1.1.1").
-  -h                = Print this help message.``
+- Compulsory arguments:
+  -``  -q <IP|hostname>  = IP or hostname address to by analyzed.``
+  -``  -w <IP|hostname>  = IP or hostname of questioned WHOIS server``
+- Optional arguments:
+  -``  -d <IP|hostname>  = IP or hostanme of questioned DNS server (default value "1.1.1.1").``
+  -``  -h                = Print this help message.``
 
 ## Repository overview
 - ``main.c`` - Starting point of program.
