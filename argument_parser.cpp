@@ -145,5 +145,3 @@ void ArgumentParser::printHelp()
 	<< "                     (default value \"1.1.1.1\")." << std::endl
 	<< "  -h                = Print this help message." << std::endl;
 }
-/*
-*/

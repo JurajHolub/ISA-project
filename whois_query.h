@@ -1,7 +1,7 @@
 /**
  * @file whois_deparser.h
  * @author Juraj Holub <xholub40@stud.fit.vutbr.cz>
- * @brief Deparse raw data recieved from whois query.
+ * @brief Send whois query and deparse recieved data.
  * @date October 2019
  */
 
