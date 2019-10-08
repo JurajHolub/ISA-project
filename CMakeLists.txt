@@ -12,6 +12,7 @@ add_executable( project main.cpp
         dns_query.h dns_query.cpp
         whois_query.h whois_query.cpp
         argument_parser.h argument_parser.cpp
+        geolocation_database.h geolocation_database.cpp
         )
 
 target_link_libraries(project ${BIND_LIBRARY})

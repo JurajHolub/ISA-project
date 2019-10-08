@@ -8,7 +8,8 @@ OBJ = main.o \
 	  dns_query.o \
 	  argument_parser.o \
 	  tcp_socket.o \
-	  whois_query.o
+	  whois_query.o \
+	  geolocation_database.o
 EXECUTABLE = isa-tazatel
 
 all: $(EXECUTABLE)

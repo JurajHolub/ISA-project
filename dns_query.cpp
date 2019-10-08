@@ -25,8 +25,6 @@ DnsQuery::DnsQuery(address_t dnsServer, address_t analyzedDomain)
 //https://git.busybox.net/busybox/plain/networking/nslookup.c
 void DnsQuery::askServer()
 {
-	std::cout << "=== DNS ===\n";
-
 	res_init();
 	_res.options &= ~(RES_DNSRCH | RES_DEFNAMES);
 	_res.options |= RES_RECURSE;

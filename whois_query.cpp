@@ -49,7 +49,6 @@ void WhoisQuery::printDeparsedData()
 		}
 	}
 
-	std::cout << "=== WHOIS ===\n";
 	if (parsedData.empty())
 	{
 		std::cout << "no entries found\n";

@@ -5,10 +5,10 @@
  * @date October 2019
  */
 
-
 #include "dns_query.h"
 #include "whois_query.h"
 #include "argument_parser.h"
+#include "geolocation_database.h"
 
 int main(int argc, char **argv)
 {
@@ -19,16 +19,27 @@ int main(int argc, char **argv)
 		return EXIT_SUCCESS;
 	}
 
-	std::cout << "Analyzed domain: " << argumentParser.getAnalyzedDomain().hostname << std::endl;
+	auto analyzedDomain = argumentParser.getAnalyzedDomain();
+	auto dnsServer = argumentParser.getDnsServer();
+	auto whoisServer = argumentParser.getWhoisServer();
 
-	DnsQuery dnsQuery(argumentParser.getDnsServer(), argumentParser.getAnalyzedDomain());
-	WhoisQuery whoisQuery(argumentParser.getWhoisServer(), argumentParser.getAnalyzedDomain());
+	DnsQuery dnsQuery(dnsServer, analyzedDomain);
+	WhoisQuery whoisQuery(whoisServer, analyzedDomain);
+	GeolocationDatabase geolocationDatabase(analyzedDomain.ipv4);
 
-	try {
+	try
+	{
+		std::cout <<   "==============================---------DNS--------==============================\n";
 		dnsQuery.askServer();
+
+		std::cout << "\n==============================--------WHOIS-------==============================\n";
 		whoisQuery.askServer();
+
+		std::cout << "\n==============================-GEOLOCATION SERVER-==============================\n";
+		geolocationDatabase.askServer();
 	}
-	catch (std::runtime_error e) {
+	catch (std::runtime_error e)
+	{
 		std::cerr << e.what() << std::endl;
 		return EXIT_FAILURE;
 	}

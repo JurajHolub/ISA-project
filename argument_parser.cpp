@@ -136,13 +136,13 @@ address_t ArgumentParser::getAnalyzedDomain()
 void ArgumentParser::printHelp()
 {
 	std::cout
-	<< "usage: isa-tazatel [-q] <IP|hostname> [options]" << std::endl
-	<< "options:" << std::endl
+	<< "usage: isa-tazatel <arguments>" << std::endl
+	<< "Compulsory arguments:" << std::endl
 	<< "  -q <IP|hostname>  = IP or hostname address to by analyzed." << std::endl
 	<< "  -w <IP|hostname>  = IP or hostname of questioned WHOIS server" << std::endl
-	<< "                      (default value \"whois.ripe.net\")." << std::endl
+	<< "Optional arguments:" << std::endl
 	<< "  -d <IP|hostname>  = IP or hostanme of questioned DNS server" << std::endl
-	<< "                      default value \"1.1.1.1.\")." << std::endl
+	<< "                     (default value \"1.1.1.1\")." << std::endl
 	<< "  -h                = Print this help message." << std::endl;
 }
 /*
