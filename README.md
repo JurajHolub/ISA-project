@@ -20,7 +20,7 @@ Compulsory arguments:
   -w <IP|hostname>  = IP or hostname of questioned WHOIS server``
 Optional arguments:
 ``  -d <IP|hostname>  = IP or hostanme of questioned DNS server
-                     (default value "1.1.1.1").
+                     (DNS resolver of OS by default).
   -h                = Print this help message.``
 
 ## Repository overview

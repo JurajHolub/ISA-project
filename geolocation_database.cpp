@@ -1,5 +1,5 @@
 /**
- * @file geolocation_database.h
+ * @file geolocation_database.c
  * @author Juraj Holub <xholub40@stud.fit.vutbr.cz>
  * @brief Create HTTP request to ip-api.com geolocation database and parse recieved data.
  * @date October 2019

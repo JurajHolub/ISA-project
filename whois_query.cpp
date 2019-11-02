@@ -14,7 +14,7 @@ void WhoisQuery::askServer()
 	//create tcp connection with whoice server and send whoice query
 	TcpSocket tcpSocket;
 	tcpSocket.connectServer(whoisServer.hostname, 43);// whois TCP service always on port 43
-	tcpSocket.sendData("-B " + analyzedDomain.ipv4 + "\r\n");
+	tcpSocket.sendData(analyzedDomain.ipv4 + "\r\n");
 	rawData = tcpSocket.recvData();
 	tcpSocket.closeConnection();
 
@@ -51,7 +51,7 @@ void WhoisQuery::printDeparsedData()
 
 	if (parsedData.empty())
 	{
-		std::cout << "no entries found\n";
+		std::cout << "Whois server found no entries.\n";
 	}
 	else
 	{

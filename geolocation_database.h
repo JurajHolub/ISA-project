@@ -13,7 +13,13 @@
 class GeolocationDatabase {
 public:
 	GeolocationDatabase(std::string analyzedDomain);
+	/**
+	 * HTTP request to geolocation server database.
+	 */
 	void askServer();
+	/**
+	 * Parse input json data and print it.
+	 */
 	void printDeparsedData(std::string& jsonData);
 
 private:

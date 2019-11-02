@@ -10,11 +10,15 @@
 #include <list>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <resolv.h>
 
 ArgumentParser::ArgumentParser()
 {
-	dnsServer.ipv4 = "1.1.1.1";
-	dnsServer.hostname = "one.one.one.one";
+	res_init(); //init DNS resolver from OS
+	char dnsIp4[INET_ADDRSTRLEN];
+	inet_ntop(AF_INET, &_res.nsaddr_list[0].sin_addr, dnsIp4, INET_ADDRSTRLEN);
+	dnsServer.ipv4 = dnsIp4;
+	dnsServer.hostname = dnsIp4;
 }
 
 bool ArgumentParser::parseArgs(int argc, char **argv)
@@ -33,25 +37,24 @@ bool ArgumentParser::parseArgs(int argc, char **argv)
 	}
 	bool domainDefined = false;
 	bool whoisDefined = false;
+	bool dnsDefined = true;
 
 	while ((opt = getopt_long_only(argc, argv, "", long_options, nullptr)) != -1)
 	{
 		switch (opt)
 		{
 			case HOSTNAME:
-				domainDefined = true;
-				analyzedDomain = parseDomain(optarg);
+				domainDefined = parseDomain(optarg, analyzedDomain);
 				argsLeft.remove("-q");
 				argsLeft.remove(optarg);
 				break;
 			case WHOISE_SERVVER:
-				whoisDefined = true;
-				whoisServer = parseDomain(optarg);
+				whoisDefined = parseDomain(optarg, whoisServer);
 				argsLeft.remove("-w");
 				argsLeft.remove(optarg);
 				break;
 			case DNS_SERVER:
-				dnsServer = parseDomain(optarg);
+				dnsDefined = parseDomain(optarg, dnsServer);
 				argsLeft.remove("-d");
 				argsLeft.remove(optarg);
 				break;
@@ -60,12 +63,11 @@ bool ArgumentParser::parseArgs(int argc, char **argv)
 		}
 	}
 
-	return argsLeft.empty() && domainDefined && whoisDefined;
+	return argsLeft.empty() && domainDefined && whoisDefined && dnsDefined;
 }
 
-address_t ArgumentParser::parseDomain(std::string input)
+bool ArgumentParser::parseDomain(std::string input, address_t &output)
 {
-	address_t output={.hostname="", .ipv4=""};
 	struct hostent* domain;
 	struct sockaddr_in tmpAddr;
 	struct sockaddr_in6 tmpAddr6;
@@ -112,10 +114,11 @@ address_t ArgumentParser::parseDomain(std::string input)
 	}
 	else
 	{
-		output.hostname = input;
+		std::cerr << "Invalid IP or Hostname: \"" << input  << "\"" << std::endl;
+		return false; // invalid ip|hostanme
 	}
 
-	return output;
+	return true; //valid ip|hostanme
 }
 
 address_t ArgumentParser::getDnsServer()
@@ -139,9 +142,9 @@ void ArgumentParser::printHelp()
 	<< "usage: isa-tazatel <arguments>" << std::endl
 	<< "Compulsory arguments:" << std::endl
 	<< "  -q <IP|hostname>  = IP or hostname address to by analyzed." << std::endl
-	<< "  -w <IP|hostname>  = IP or hostname of questioned WHOIS server" << std::endl
+	<< "  -w <IP|hostname>  = IP or hostname of questioned WHOIS server." << std::endl
 	<< "Optional arguments:" << std::endl
-	<< "  -d <IP|hostname>  = IP or hostanme of questioned DNS server" << std::endl
-	<< "                     (default value \"1.1.1.1\")." << std::endl
+	<< "  -d <IP|hostname>  = IP or hostanme of questioned DNS server." << std::endl
+	<< "                     (DNS resolver of OS by default)." << std::endl
 	<< "  -h                = Print this help message." << std::endl;
 }

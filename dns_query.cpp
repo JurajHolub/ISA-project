@@ -1,7 +1,7 @@
 /**
  * @file dns_query.cpp
  * @author Juraj Holub <xholub40@stud.fit.vutbr.cz>
- * @brief Send DNS query and deparse response data with lreslov library.
+ * @brief Send DNS query and deparse response data with resolv library.
  * @date October 2019
  */
 
@@ -21,11 +21,11 @@ DnsQuery::DnsQuery(address_t dnsServer, address_t analyzedDomain)
 	this->analyzedDomain = analyzedDomain;
 }
 
-//https://docstore.mik.ua/orelly/networking_2ndEd/dns/ch15_02.htm
-//https://git.busybox.net/busybox/plain/networking/nslookup.c
+// Inspired by:
+// https://docstore.mik.ua/orelly/networking_2ndEd/dns/ch15_02.htm
+// https://git.busybox.net/busybox/plain/networking/nslookup.c
 void DnsQuery::askServer()
 {
-	res_init();
 	_res.options &= ~(RES_DNSRCH | RES_DEFNAMES);
 	_res.options |= RES_RECURSE;
 	_res.retry = 2;
@@ -74,14 +74,14 @@ void DnsQuery::askServer()
 			}
 			if (ns_rr_type(parsedRecord) != queryType.at(i).first)
 			{
-				throw std::runtime_error("error: Did not recieve " + queryType.at(i).second);
+				continue;
 			}
 			printResultOFDnsQueries(queryType.at(i), parsedRecord, messageHandler);
 		}
 	}
 }
 
-// https://git.busybox.net/busybox/plain/networking/nslookup.c
+// Inspired by https://git.busybox.net/busybox/plain/networking/nslookup.c
 void DnsQuery::printResultOFDnsQueries(
 	std::pair<__ns_type, std::string> queryType,
 	ns_rr parsedRecord,
@@ -92,7 +92,7 @@ void DnsQuery::printResultOFDnsQueries(
 	u_char *dataEnd = (u_char*) ns_msg_end(messageHandler);
 	char domain[MAXDNAME];
 	char ipAddr[INET6_ADDRSTRLEN];
-	int n;
+	int size;
 
 	std::string result;
 	switch (queryType.first)
@@ -106,11 +106,11 @@ void DnsQuery::printResultOFDnsQueries(
 			result = ipAddr;
 			break;
 		case ns_t_soa:
-			n = ns_name_uncompress(dataBegin, dataEnd, dataPtr, domain, MAXDNAME);
+			size = ns_name_uncompress(dataBegin, dataEnd, dataPtr, domain, MAXDNAME);
 			result = "origin " + std::string(domain) + "\n";
-			n = ns_name_uncompress(dataBegin, dataEnd, (dataPtr += n), domain, MAXDNAME);
+			size = ns_name_uncompress(dataBegin, dataEnd, (dataPtr += size), domain, MAXDNAME);
 			result += "SOA:\t\t\temail "   + std::string(domain) + "\n";
-			result += "SOA:\t\t\tserial "  + std::to_string(ns_get32(dataPtr += n)) + "\n";
+			result += "SOA:\t\t\tserial " + std::to_string(ns_get32(dataPtr += size)) + "\n";
 			result += "SOA:\t\t\trefresh " + std::to_string(ns_get32(dataPtr += 4)) + "\n";
 			result += "SOA:\t\t\tretry "   + std::to_string(ns_get32(dataPtr += 4)) + "\n";
 			result += "SOA:\t\t\texpire "  + std::to_string(ns_get32(dataPtr += 4)) + "\n";
@@ -138,6 +138,6 @@ void DnsQuery::printResultOFDnsQueries(
 		printf("%-15s %s\n", queryType.second.c_str(), result.c_str());
 	} else
 	{
-		std::cout << "no entries found\n";
+		std::cout << "DNS server found no entries.\n";
 	}
 }

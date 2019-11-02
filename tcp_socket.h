@@ -20,6 +20,7 @@ public:
 
 private:
 	int socket_id;
+	std::string dst_addr;
 };
 
 

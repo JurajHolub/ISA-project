@@ -35,8 +35,9 @@ public:
 	 * If input is domain name then find IPv4 address.
 	 * If input is IPv6 then find domain name and by domain name find ipv4.
 	 * Else dont fill ipv4 and domain and DNS or Whois server didnt found content (user input error).
+	 * @return True if input is valid IP|hostname.
 	 */
-	address_t parseDomain(std::string input);
+	bool parseDomain(std::string input, address_t &output);
 
 private:
 	address_t whoisServer;

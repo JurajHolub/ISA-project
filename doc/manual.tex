@@ -19,6 +19,7 @@
 \usepackage{wrapfig}
 \usepackage{listings}
 \usepackage{cite}
+\usepackage{multicol}
 
 %\date{}
 
@@ -36,7 +37,7 @@
 		{\LARGE
 			ISA - Síťové aplikace a správa sítí \\ 
 			\medskip \Large{Manuál k projektu 
-				Programování síťové služby}
+				Programování síťové služby Whois tazatel}
 			\vspace{\stretch{0.618}}}
 	\end{center}
 		\setlength{\parindent}{0.3em}
@@ -48,94 +49,541 @@
 \newpage
 
 \section{Úvod}
-Port scan aplikácia je program, ktorý posiela klientské dotazy na rôzne porty hostujúceho serveru s cieľom nájsť aktívne porty. Takýto tip aplikácie môžu využívať administrátory s cieľom preverenia bezpečnosti ich siete. Predovšetkým je však tento tip aplikácie využívaný útočníkmi pre identifikovanie sieťovej služby a zistenie jej zraniteľnosti. Existuje veľa rôznych techník skenovania portov. Medzi najznámejšie patrí TCP SYN scan, TCP connect scan, UDP scan, SCTP INIT scan alebo napríklad TCP ACK scan. Táto aplikácia implementuje dve najznámejšie techniky: TCP SYN scan a UDP scan.
-%https://tools.ietf.org/html/rfc2828#section-3
-\cite{rfc_2828}
-\section{Architektúra aplikácie}
-\begin{wrapfigure}{r}{0.3\textwidth}
-	\centering
-	\includegraphics[width=.25 \paperwidth]{app_inheritance.pdf}
-	\caption{Scheme implemntácie aplikácie.}
-	\label{obr1}
-\end{wrapfigure} 
- Program je implementovaný v jazyku C++11, využíva systémové knihovny pre vytváranie  \href{http://pubs.opengroup.org/onlinepubs/007908775/xns/syssocket.h.html}{BSD socketov} a prijíma odpovede pomocou knihovny \href{https://www.tcpdump.org/}{libpcap} . Program implementuje dve techniky skenovania, ktoré sa predovšetým líšia v transportnej vrstve. Objektová implementácia aplikácie je preto rozdelena na tri hlavné triedy:
- \begin{itemize}
- 	\item \textbf{TCP Scanner}: Vytvorí a vyplní transportnú vrstvu TCP SYN raw packetom. Tento tip TCP packetu sa používa pre zahájenie spojenia pomocou 3-way handshaku. %https://study-ccna.com/tcp-three-way-handshake/
- 	 Následne sa zaháji spojenie zo skenovaným portom a na základe odpovede sa vyhodnocuje stav tohoto portu (viď. sekcia \ref{sec_tcp_scanner}).
- 	\item \textbf{UDP Scanner}: Vytvorí a vyplní transportnú vrstvu UDP obálkov a pošle daný packet na skenovaný port. Následne sa čaká na odpoveď (viď. sekcia \ref{sec_udp_scanner}).
- 	\item \textbf{Scanner}: Oba tipy packetov používajú rovnakú sieťovú vrstvu, preto implementácia vytvárania IPv4 hlavičky zdieľajú obe podtriedy. Táto rodičovská trieda taktiež implementuje ďalšiu spoločnú funkcionalitu ako je výpočet kontrolného súčtu alebo získavanie vhodného rozhrania a IP adresy zariadenia na ktorom program beží.
- \end{itemize}
+Doménové meno je jednoznačný identifikátor objektu (počítač, sieť a podobne) v Internete. Doménové meno môže poskytovať množstvo informácií o tomto objekte ako sú informácie o vlastníkovy, geografické vlastosti a podobne. Tieto informácie sa dajú získavať pomocou rôznych internetových protokolov. Tento manuál popisuje aplikáciu, ktorá získava takéto informácií pomocou internetových protokolov Domain Name System (DNS), Whois a taktiež pomocou geolokačných databáz.
 
-\section{TCP skenovanie}\label{sec_tcp_scanner}
-%https://nmap.org/book/synscan.html
-TCP SYN scan je najznámejší a najpopulárnejší spôsob skenovania portov. Ide o veľmy rýchly spôsob skenovania (nástroj \href{https://nmap.org/book/synscan.html}{nmap} tvrdí, že dokáže skenovať rádovo tisícky portov za sekundu). Princíp skenovania využíva TCP 3-way-handshake pri naviazaní spojenia. Na začiatku klient zašle TCP packet z nastaveným SYN príznakom. \cite{nmap_book} Na základe odpovede serveru môžeme port označiť ako:
+\subsection{DNS protokol}
+Ako popisuje RFC 1034\cite{RFC1034}, štruktúra unikátneho pomenovania domén na internete sa v pribehu času vyvýjala na základe rôznych požiadaviek. Meno hostiteľa (anglicky hostname) spravoval systém Network Information Center (NIC). Systém nedostačoval vzhľadom na rapidný nárast počtu uživateľov. Aplikácie na internete boli stále sofistikovanejšie a potrebovali obecnejší systém. Výsledokom bol vznik Domain Name System (DNS). DNS je hierarchický a decentrlizovaný systém, ktorý spája meno hostiteľa s rôznymi informáciami, pričom najpodstatnejšou informáciou je Internet Protocol adresa (IP). Komunikáciu s DNS serverom definuje DNS protocol. DNS server poskytuje databázu do ktorej sa dá dotazovať a server poskytuje odpovede.
+
+\subsection{Whois protokol}
+Pre viac podrobné informácie o doméne (detaily o vlastníkovy domény) existuje internetový protokol Whois\cite{RFC3912}. Systém umožnuje podobný dotaz/odpoveď servis.
+
+\subsection{Geolokačné databázy}
+Ďalšou možnosťou získania ešte podrobnejších informácií spojených s geografickou polohou objektu reprezentovaného pod doménovým menom je možnosť využiť geolokačné databázy. Tieto databázy spravujú rôzne spoločnosti, ktoré vlastnia  veľké množstvo geolokačných informácií. Spôsob ako datá získavajú nie je predmetom tejto práce.
+
+\section{Architektúra a implementácia aplikácie}
+Program je implementovaný v C++ a používa funkcionalitu štandardnej knihovny. Ďalej pre vytváranie TCP socketov používa knihovnu BSD sockets a pre komunikáciu s DNS serverom používa knihovnu \texttt{<resolv.h>}. Architektúra aplikácie je rozdelená na niekoľko samostatných celkov (tried), ktoré sú popísané v tejto kapitole.
+\subsection{Argument Parser} Spracováva argumenty s príkazovej riadky. Unifikuje vstupné doménové mená, IPv4 a IPv6 adresy na IPv4 adresy aby ostatné komponenty programu mohli pracovať s jednotnou reprezentáciou.
+\subsection{TCP socket} Umožnuje vytvárať TCP komunikáciu. TCP komunikáciu aplikácia využíva pri komunikácii s DNS serverom a taktiež pri komunikácii s geolokačnou databázou. Komponenta využíva pre TCP komunikáciu štandardné funkcie knihovny BSD sockets.
+\subsection{DNS query} Vytvára dotazy na DNS databázu. Pre vytváranie a prijímanie dotazov a odpovedí sa využíva funkcionalita z knihovny \texttt{resolv.h}. Aplikácia sa dotazuje na informácie, ktoré šadnardne obsahuje DNS protokol (A, AAAA, MX, CNAME, NS, SOA, TXT a PTR). Význam jednotlivých položiek v protokole je popísaný v RFC 1045\cite{RFC1035}. Komunikácia prebieha tak, že sa postupne aplikácia dotazuje na jednotlivé políčka a vyhodnocuje prijaté odpovede. Získané datá sa zobrazia uživateľovi.
+\subsection{Whois query} Vytvára dotazy na whois databázu a prijíma odpovede. Server na ktorý sú dotazy zasielané špecifikuje uživateľ. Dotaz zasiela ako TCP paket na server špecifikovaný uživateľom na port 43, na tomto porte beží služba hostiteľa Stanford Research Institute’s Network Information Center (SRI NIC\cite{RFC0954}). Whois server zašle odpoveď pomocou TCP komunikácie a táto komponenta ho zanalyzuje. Na rozdiel od DNS dotazovania, tu sa zašle jediný dotaz, ktorý obsahuje IP adresu analyzovanej domény a whois server zašle späť všetky jeho dostupné datá. Komponenda následne datá zanalyzuje, vyhodnotí a zobrazí ich uživateľovi.
+\subsection{Geolocation database} Umožnuje získavanie informácií z geolokačnej databázy \href{ip-api}{ip-api.com}. Ide o voľne dostupnú, neplatenú geolokačnú databázu, ktorú je momžné voľne využívať pre nekomerčné účely (viac viď. podmienky používania\cite{ip_api_terms}). S databázou sa komunikuje pomocou HTTP protokolu. Trieda vytvorí TCP paket s HTTP hlavičkou, ktorej url obsahuje dotazovanú IP adresu vo formáte definovanom aplikačným rozhraním tejto databázy. Databáza voľbu formátu odpovede, ktorú zašle späť (json, csv, xml). Trieda následne prijaté datá zanalyzuje a zobrazí uživateľovi.
+
+\section{Návod na použitie}
+Program je nativne vyvýjaný pre OS GNU/Linux (na Windows netestované). Preložiť program je možné priloženým \texttt{Makefile}. Program sa používa následovne: \texttt{isa-tazatel <arguments>}, pričom argumenty sú rozdelené na povinné a nepovinné.
+
+Povinné argumenty:
 \begin{itemize}
-	\item \textbf{Otvorený} v prípade, že server zašle späť TCP packet s nastavenými príznakmi SYN a ACK.
-	\item \textbf{Zatvorený} v prípade, že server zašle späť TCP packet s nastaveným príznakom RST.
-	\item \textbf{Filtrovaný} ak odpoveď zo serveru nepríde. V takomto prípade sa skúsi ešte raz zaslať SYN packet.
+	\item\texttt{-q <IP|hostname>} - IP adresa alebo názov hostiteľa, ktorý bude analyzovaný.
+	\item \texttt{-w <IP|hostname>} - IP adresa alebo názov hostiteľa Whois serveru, na ktorý budú zasielané dotazy.
 \end{itemize}
-\begin{figure}[H] 
-\centering
-\includegraphics[width=.8 \paperwidth]{tcp_scanning.pdf}
-\caption{Princíp vyhodnotenia TCP SYN packet skenovania.}
-\label{obr1}
-\end{figure} 
 
-Implementovaný TCP scanner vytvára a zasiela SYN packet pomocou BSD socket knihovny a na odpoveď serveru využíva libpcap knihovnu. Libpcap knihovna umožnuje vytvorenie filtru, ktorý prijíma packety len z predom definovaného portu a IP adresy. Taktiež umožnuje nastavenie maximálnej doby čakania na packet čo je využívané pre rozpoznanie situácie, že packet sa stratil (bol odfiltorvaný sieťov).
-
-\section{UDP skenovanie}\label{sec_udp_scanner}
-Na rozdiel od TCP SYN skenovania je UDP skenovanie portov všeobecne pomalšie a zložitejšie. UDP protokol nevytvára spojenie (connection-less). Otvorené porty potom nezasielajú spätnú informáciu na náš packet a ani zatvorené porty nemusia zasielať error packet. Avšak ak je packet zaslaný na zavrený port, tak väčšina hostov zasiela ICMP packet typu 3 s kódom 3 (Port unreachable). \cite{nmap_book} Na základe tejto znalosti vyhodnocujeme skenované porty následovne:
+Nepovinné argumenty:
 \begin{itemize}
-	\item \textbf{Zatvorený} ak na náš UDP packet odpovedal host ICMP port unreachable packetom.
-	\item \textbf{Otvorený} v opačnom prípade ale keďže nemáme žiadnu informáciu o tom či sa ICMP packet nestratil, tak skenovanie opakujeme viackrát.
+	\item \texttt{-d <IP|hostname>} IP adresa alebo názov hostiteľa DNS server na ktorý budú zasielané dotazy. Ak nie je zadaný tak sa bude implicitne používaať adresa \texttt{1.1.1.1}.
+	\item \texttt{-h} - Nápoveda na používanie argumentov.
 \end{itemize}
+
+
 \section{Testovanie}
-Pre testovanie bola ako referenčný nástroj použitá open source utilita \href{https://nmap.org/}{\textbf{nmap}} . Pre overenie správnosti zasielaných packetov sa využil analyzátor sieťových protokolov \href{https://www.wireshark.org/}{\textbf{wireshark}} . Príklad \ref{listing_nmap} ukazuje referenčný sken zvolených portov pomocou utility nmap. Naopak príklad \ref{listing_my_app} ukazuje sken portov pomocou tejto aplikácie. Výsledky skenovania sú zhodné s výsledkamy skenovania pomocou referenčného naśtroja nmap.
 
-\begin{lstlisting}[caption={Príklad skenovania pomocou utility nmap.}, label={listing_nmap}]
-user@pc:~$ sudo nmap -sU -sS -p25,80 localhost
+Pre testovanie boli ako referenčný nástroj použité open source utility \href{https://linux.die.net/man/1/nslookup}{\textbf{nslookup}} , \href{https://linux.die.net/man/1/host}{\textbf{host}}, \href{https://linux.die.net/man/1/dig}{\textbf{dig}} a \href{https://linux.die.net/man/1/whois}{\textbf{whois}}. Pre overenie správnosti zasielaných paketov sa využil analyzátor sieťových protokolov \href{https://www.wireshark.org/}{\textbf{wireshark}} .
 
-Starting Nmap 7.60 ( https://nmap.org ) at 2019-04-12 14:01 CEST
-Nmap scan report for localhost (127.0.0.1)
-Host is up (0.000026s latency).
+Pre získanie referenčných dát z DNS serveru pre testovanú doménu sa využil nástroj \texttt{dig}, pomocou ktorej sa postupne dotazovalo na A, AAAA, MX, CNAME, NS, SOA a PTR. Výsledky dotazov sú zprehľadnené v tabuľke. Pre referenčné Whois datá sa použila utilita \texttt{whois} s atribútom IPv4 adresy analyzovanej domény. IP adresa bola získaná predchádzajúcim dotazom utilitou \texttt{dig}. Datá získané z referenčných nástrojov pre testované domény sú v prílohe 1. Datá získané touto aplikáciu pre rovnaké domény sú priložené v prílohe 2. 
 
-PORT   STATE  SERVICE
-25/tcp closed smtp
-80/tcp open   http
-25/udp closed smtp
-80/udp closed http
-
-Nmap done: 1 IP address (1 host up) scanned in 0.54 seconds
-\end{lstlisting}
-
-\begin{lstlisting}[caption={Príklad skenovania portov touto aplikáciou.}, label={listing_my_app}]
-user@pc:~$ sudo ./ipk-scan -pt 25,80 -pu 25,80 localhost
-PORT                STATE
-25/tcp              closed
-80/tcp              open
-25/udp              closed
-80/udp              closed
-\end{lstlisting}
-
-Obrázok \ref{obr_tcp_syn} zobrazuje packety zasielané medzi klientom (port scanner) a skenovaným portom v prípade TCP SYN skenovania. Skenovaný port na SYN packet odpovedal TCP packetom s nastavenými príznakmy SYN a ACK a teda ho považujeme za otovorený.
-\begin{figure}[H] 
-	\centering
-	\includegraphics[width=.8 \paperwidth]{tcp_syn.png}
-	\caption{TCP SYN scan portu 80.}
-	\label{obr1}
-\end{figure} \label{obr_tcp_syn}
-
-Na obrázoku \ref{obr_udp_scan} je výsledok skenovania pomocou UDP packetu. Host zaslal ako odpoveď ICMP packet typu 3 s kódom 3 (Port unreachable) a preto port považujeme za zatvorený. V prípade, že by nebola žiadna ICMP zpráva prijatá, opakovalo by sa zaslanie UDP packetu ešte niekoľkokrát (implementovaná aplikácia by prípadne poslala požiadavok celkom 3-krát) a ak by nedošlo k ICMP odpovedi, port by sa označil za otvorený.
-
-\begin{figure}[H] 
-	\centering
-	\includegraphics[width=.8 \paperwidth]{udp_scan.png}
-	\caption{UDP scan portu 80 a následná odpoveď ICMP packetom (Port unreachable).}
-	\label{obr1}
-\end{figure} \label{obr_udp_scan}
+V rámci testovania sa experimentovalo s piatimi doménami. Testované domény a výsledky testov:
+\begin{itemize}
+	\item \textbf{www.youtube.com}: Výsledok DNS dotazov sa zhodoval. Výsledky whois dotazov sa nezhodovali lebo doména je spravovaná whois serverom \texttt{whois.arin.net} a mi sme zasielali dotaz na server \texttt{whois.ripe.net}. Výstup experimentu je v prílohe \ref{experiment_1}.
+	\item \textbf{www.netflix.com} Výsledok experimentu je veľmi podobný predchádzajúcemu. Výstup je v prílohe \ref{experiment_2}.
+	\item \textbf{www.fit.vutbr.cz} Výsledok DNS aj Whois zhodný ale keď že aplikácia neodchytáva všetky whois datá tak boli niektoré informácie oproti referenčnému nástroju zahodené. Výsledky experimentu sú v prílohe \ref{experiment_3}.
+	\item \textbf{www.seznam.cz} Výsledok experimentu je veľmi podobný predchádzajúcemu. Výstup je v prílohe  \ref{experiment_4}
+	\item \textbf{vutbr.cz} DNS server oproti predchádzajúcim experimentom poskytol viacej informácií ako len IP adresy. Inak je výsledok experimentu podobný predchádzajúcim. Výstup je v prílohe \ref{experiment_5}
+\end{itemize}
+Datá získané touto aplikáciu sa zhodovali s datami získanými z referenčných nástrojov (okrem whois dotazov u ktorých referenčný nástroj využil iný whois server). Avšak referenčné nástroje dokázali získať niektoré datá navyše, ktoré táto aplikácia nezískala. Informácie získané geolokačným serverom som neporovnával voči žiadnemu referenčnéu nástroju avšak zbežný pohľad do výstupov (napr. geograická adresa poskytnutá whois a geolokačným serverom) ukazuje na to, že informácie by mohli byť dôverihodné.
 
 \newpage
 \bibliographystyle{czechiso}
 \bibliography{bib}
+
+\newpage
+\appendix
+\section{Výsledky experimentovania s aplikáciou.}
+\subsection{Experiment 1}\label{experiment_1}
+\begin{lstlisting}[caption={Výsledok dotazu nad doménov \textbf{www.youtube.com}.},captionpos=b, label={test_app_1}]
+user@pc:~$ ./isa-tazatel -q www.youtube.com -w whois.ripe.net
+==============================---------DNS--------==============================
+AAAA:           2a00:1450:4014:801::200e
+A:              172.217.23.238
+A:              172.217.23.206
+CNAME:          youtube-ui.l.google.com
+
+==============================--------WHOIS-------==============================
+inetnum:        172.103.96.0 - 172.240.255.255
+netname:        NON-RIPE-NCC-MANAGED-ADDRESS-BLOCK
+descr:          IPv4 address block not managed by the RIPE NCC
+country:        EU \# Country is really world wide
+address:        see http://www.iana.org.
+admin-c:        IANA1-RIPE
+admin-c:        IANA1-RIPE
+
+==============================-GEOLOCATION SERVER-==============================
+continent       Europe
+continentCode   EU
+country         Czechia
+countryCode     CZ
+region          10
+regionName      Hlavni mesto Praha
+city            Prague
+timezone        Europe/Prague
+currency        CZK
+isp             Google LLC
+org             Google LLC
+as              AS15169 Google LLC
+asname          Google
+reverse         prg03s06-in-f238.1e100.net
+query           172.217.23.238
+\end{lstlisting}
+
+\begin{table}[h]
+	\label{dns_refer_1}
+	\centering
+		\begin{tabular}{|c|c|}
+			\hline
+			\textbf{Záznam} & \textbf{Výsledok dotazu} \\ \hline
+			A & \begin{tabular}[c]{@{}c@{}}172.217.23.238\\ 172.217.23.206\end{tabular} \\ \hline
+			AAAA & 2a00:1450:4014:80c::200e \\ \hline
+			CNAME & youtube-ui.l.google.com. \\ \hline
+			SOA & - \\ \hline
+			NS & - \\ \hline
+			PTR & - \\ \hline
+			MX & - \\ \hline
+		\end{tabular}
+	\caption{Referenčné DNS dotazy nad doménov \textbf{www.youtube.com}.}
+\end{table}
+
+\begin{lstlisting}[caption={Referenčný Whois dotaz nad doménov \textbf{www.youtube.com}.},captionpos=b, label={whois_refer_1}]
+user@pc:~$ whois 172.217.23.238 #ip address from dig www.youtube.com A
+...
+NetRange:       172.217.0.0 - 172.217.255.255
+CIDR:           172.217.0.0/16
+NetName:        GOOGLE
+NetHandle:      NET-172-217-0-0-1
+Parent:         NET172 (NET-172-0-0-0-0)
+NetType:        Direct Allocation
+OriginAS:       AS15169
+Organization:   Google LLC (GOGL)
+RegDate:        2012-04-16
+Updated:        2012-04-16
+Ref:            https://rdap.arin.net/registry/ip/172.217.0.0
+OrgName:        Google LLC
+OrgId:          GOGL
+Address:        1600 Amphitheatre Parkway
+City:           Mountain View
+StateProv:      CA
+PostalCode:     94043
+Country:        US
+RegDate:        2000-03-30
+Updated:        2019-10-31
+Comment:        Please note that the recommended way to file abuse complaints are located in the following links. 
+Comment:        
+Comment:        To report abuse and illegal activity: https://www.google.com/contact/
+Comment:        
+Comment:        For legal requests: http://support.google.com/legal 
+Comment:        
+Comment:        Regards, 
+Comment:        The Google Team
+Ref:            https://rdap.arin.net/registry/entity/GOGL
+OrgTechHandle: ZG39-ARIN
+OrgTechName:   Google LLC
+OrgTechPhone:  +1-650-253-0000 
+OrgTechEmail:  arin-contact@google.com
+OrgTechRef:    https://rdap.arin.net/registry/entity/ZG39-ARIN
+OrgAbuseHandle: ABUSE5250-ARIN
+OrgAbuseName:   Abuse
+OrgAbusePhone:  +1-650-253-0000 
+OrgAbuseEmail:  network-abuse@google.com
+OrgAbuseRef:    https://rdap.arin.net/registry/entity/ABUSE5250-ARIN
+\end{lstlisting}
+
+\subsection{Experiment 2}\label{experiment_2}
+\begin{lstlisting}[caption={Výsledok dotazu nad doménov \textbf{www.netflix.com}.}, label={test_app_2}]
+user@pc:~$ ./isa-tazatel -q www.netflix.com -w whois.ripe.net
+==============================---------DNS--------==============================
+AAAA:           2a01:578:3::341e:6717
+AAAA:           2a01:578:3::22fc:b3a2
+AAAA:           2a01:578:3::3411:db4d
+AAAA:           2a01:578:3::364d:8fc4
+AAAA:           2a01:578:3::3411:e3ae
+AAAA:           2a01:578:3::3412:f09
+AAAA:           2a01:578:3::36ab:bb3c
+AAAA:           2a01:578:3::34d1:4fba
+A:              52.210.7.69
+A:              52.31.145.183
+A:              54.171.116.69
+A:              52.209.235.141
+A:              52.30.45.198
+A:              54.72.216.241
+A:              54.77.108.2
+A:              52.31.182.100
+CNAME:          www.geo.netflix.com
+TXT:            "v=spf1 -all"
+
+==============================--------WHOIS-------==============================
+inetnum:        52.144.96.0 - 52.255.255.255
+netname:        NON-RIPE-NCC-MANAGED-ADDRESS-BLOCK
+descr:          IPv4 address block not managed by the RIPE NCC
+country:        EU # Country is really world wide
+address:        see http://www.iana.org.
+admin-c:        IANA1-RIPE
+admin-c:        IANA1-RIPE
+
+==============================-GEOLOCATION SERVER-==============================
+continent       Europe
+continentCode   EU
+country         Ireland
+countryCode     IE
+region          L
+regionName      Leinster
+city            Dublin
+zip             D02
+timezone        Europe/Dublin
+currency        EUR
+isp             Amazon Technologies Inc.
+org             AWS EC2 (eu-west-1)
+as              AS16509 Amazon.com, Inc.
+asname          Amazon
+reverse         ec2-52-210-7-69.eu-west-1.compute.amazonaws.com
+query           52.210.7.69
+\end{lstlisting}
+
+\begin{table}[h]
+	\label{dns_refer_2}
+	\centering
+	\begin{tabular}{|c|c|}
+		\hline
+		\textbf{Záznam} & \textbf{Výsledok dotazu} \\ \hline
+		A & \begin{tabular}[c]{@{}c@{}}
+			2a01:578:3::341e:6717\\ 
+			2a01:578:3::22fc:b3a2\\ 
+			2a01:578:3::3411:db4d\\ 
+			2a01:578:3::364d:8fc4\\ 
+			2a01:578:3::3411:e3ae\\ 
+			2a01:578:3::3412:f09\\ 
+			2a01:578:3::36ab:bb3c\\ 
+			2a01:578:3::34d1:4fba\end{tabular} \\ \hline
+		AAAA & \begin{tabular}[c]{@{}c@{}}
+			52.210.7.69\\
+			52.31.145.183\\
+			54.171.116.69\\
+			52.209.235.141\\
+			52.30.45.198\\
+			54.72.216.241\\
+			54.77.108.2\\
+			52.31.182.100\end{tabular} \\ \hline
+		CNAME & www.geo.netflix.com. \\ \hline
+		SOA & - \\ \hline
+		NS & - \\ \hline
+		PTR & - \\ \hline
+		MX & - \\ \hline
+	\end{tabular}
+	\caption{Referenčné DNS dotazy nad doménov \textbf{www.netflix.com}.}
+\end{table}
+
+\begin{lstlisting}[caption={Referenčný Whois dotaz nad doménov \textbf{www.netflix.com}.},captionpos=b, label={whois_refer_2}]
+user@pc:~$ whois 52.210.7.69 #ip address from dig www.netflix.com A
+...
+NetRange:       52.208.0.0 - 52.215.255.255
+CIDR:           52.208.0.0/13
+NetName:        AMAZON-DUB
+NetHandle:      NET-52-208-0-0-1
+Parent:         AT-88-Z (NET-52-192-0-0-1)
+NetType:        Reallocated
+OriginAS:       AS16509
+Organization:   Amazon Data Services Ireland Limited (ADSIL-1)
+RegDate:        2015-12-14
+Updated:        2015-12-14
+Ref:            https://rdap.arin.net/registry/ip/52.208.0.0
+
+
+OrgName:        Amazon Data Services Ireland Limited
+OrgId:          ADSIL-1
+Address:        Unit 4033, Citywest Avenue Citywest Business Park
+City:           Dublin
+StateProv:      D24
+PostalCode:     
+Country:        IE
+RegDate:        2014-07-18
+Updated:        2014-07-18
+Ref:            https://rdap.arin.net/registry/entity/ADSIL-1
+
+
+OrgNOCHandle: AANO1-ARIN
+OrgNOCName:   Amazon AWS Network Operations
+OrgNOCPhone:  +1-206-266-4064 
+OrgNOCEmail:  amzn-noc-contact@amazon.com
+OrgNOCRef:    https://rdap.arin.net/registry/entity/AANO1-ARIN
+
+OrgTechHandle: ANO24-ARIN
+OrgTechName:   Amazon EC2 Network Operations
+OrgTechPhone:  +1-206-266-4064 
+OrgTechEmail:  amzn-noc-contact@amazon.com
+OrgTechRef:    https://rdap.arin.net/registry/entity/ANO24-ARIN
+
+OrgAbuseHandle: AEA8-ARIN
+OrgAbuseName:   Amazon EC2 Abuse
+OrgAbusePhone:  +1-206-266-4064 
+OrgAbuseEmail:  abuse@amazonaws.com
+OrgAbuseRef:    https://rdap.arin.net/registry/entity/AEA8-ARIN
+\end{lstlisting}
+
+\subsection{Experiment 3}\label{experiment_3}
+\begin{lstlisting}[caption={Výsledok dotazu nad doménov \textbf{www.fit.vutbr.cz}.},captionpos=b, label={test_app_3}]
+user@pc:~$ ./isa-tazatel -q www.fit.vutbr.cz -w whois.ripe.net
+==============================---------DNS--------==============================
+AAAA:           2001:67c:1220:809::93e5:917
+A:              147.229.9.23
+MX:             0 tereza.fit.vutbr.cz
+
+==============================--------WHOIS-------==============================
+inetnum:        147.229.0.0 - 147.229.254.255
+netname:        VUTBRNET
+descr:          Brno University of Technology
+descr:          VUTBR-NET1
+country:        CZ
+address:        Brno University of Technology
+address:        Antoninska 1
+address:        601 90 Brno
+address:        The Czech Republic
+phone:          +420 541145453
+phone:          +420 723047787
+admin-c:        CA6319-RIPE
+
+==============================-GEOLOCATION SERVER-==============================
+continent       Europe
+continentCode   EU
+country         Czechia
+countryCode     CZ
+region          64
+regionName      South Moravian
+city            Brno
+zip             614 00
+timezone        Europe/Prague
+currency        CZK
+isp             VUTBR
+org             Brno University of Technology
+as              AS197451 Brno University of Technology
+asname          VUTBR-AS
+reverse         www.fit.vutbr.cz
+query           147.229.9.23
+\end{lstlisting}
+
+
+\begin{table}[h]
+	\label{dns_refer_3}
+	\centering
+	\begin{tabular}{|c|c|}
+		\hline
+		\textbf{Záznam} & \textbf{Výsledok dotazu} \\ \hline
+		A & 147.229.9.23 \\ \hline
+		AAAA & 2001:67c:1220:809::93e5:917 \\ \hline
+		CNAME & - \\ \hline
+		SOA & - \\ \hline
+		NS & - \\ \hline
+		PTR & - \\ \hline
+		MX & tereza.fit.vutbr.cz\\ \hline
+	\end{tabular}
+	\caption{Referenčné DNS dotazy nad doménov \textbf{www.fit.vutbr.cz}.}
+\end{table}
+
+\begin{lstlisting}[caption={Referenčný Whois dotaz nad doménov \textbf{www.fit.vutbr.cz}.},captionpos=b, label={whois_refer_2}]
+user@pc:~$ whois 147.229.9.23 #ip address from dig www.fit.vutbr.cz A
+...
+NetRange:       147.228.0.0 - 147.237.255.255
+CIDR:           147.236.0.0/15, 147.232.0.0/14, 147.228.0.0/14
+NetName:        RIPE-ERX-147-228-0-0
+NetHandle:      NET-147-228-0-0-1
+Parent:         NET147 (NET-147-0-0-0-0)
+NetType:        Early Registrations, Transferred to RIPE NCC
+OriginAS:       
+Organization:   RIPE Network Coordination Centre (RIPE)
+RegDate:        2003-10-08
+Updated:        2003-10-08
+Comment:        These addresses have been further assigned to users in
+Comment:        the RIPE NCC region.  Contact information can be found in
+Comment:        the RIPE database at http://www.ripe.net/whois
+Ref:            https://rdap.arin.net/registry/ip/147.228.0.0
+ResourceLink:  https://apps.db.ripe.net/search/query.html
+ResourceLink:  whois.ripe.net
+OrgName:        RIPE Network Coordination Centre
+OrgId:          RIPE
+Address:        P.O. Box 10096
+City:           Amsterdam
+StateProv:      
+PostalCode:     1001EB
+Country:        NL
+RegDate:        
+Updated:        2013-07-29
+Ref:            https://rdap.arin.net/registry/entity/RIPE
+ReferralServer:  whois://whois.ripe.net
+ResourceLink:  https://apps.db.ripe.net/search/query.html
+OrgAbuseHandle: ABUSE3850-ARIN
+OrgAbuseName:   Abuse Contact
+OrgAbusePhone:  +31205354444 
+OrgAbuseEmail:  abuse@ripe.net
+OrgAbuseRef:    https://rdap.arin.net/registry/entity/ABUSE3850-ARIN
+OrgTechHandle: RNO29-ARIN
+OrgTechName:   RIPE NCC Operations
+OrgTechPhone:  +31 20 535 4444 
+OrgTechEmail:  hostmaster@ripe.net
+OrgTechRef:    https://rdap.arin.net/registry/entity/RNO29-ARIN
+\end{lstlisting}
+
+\subsection{Experiment 4}\label{experiment_4}
+\begin{lstlisting}[caption={Výsledok dotazu nad doménov \textbf{www.seznam.cz}.},captionpos=b, label={test_app_4}]
+user@pc:~$ ./isa-tazatel -q www.seznam.cz -w whois.ripe.net
+==============================---------DNS--------==============================
+AAAA:           2a02:598:4444:1::1
+AAAA:           2a02:598:3333:1::1
+AAAA:           2a02:598:4444:1::2
+AAAA:           2a02:598:3333:1::2
+A:              77.75.75.172
+A:              77.75.74.172
+A:              77.75.75.176
+A:              77.75.74.176
+
+==============================--------WHOIS-------==============================
+inetnum:        77.75.74.0 - 77.75.74.255
+netname:        SEZNAM-CZ
+descr:          Seznam.cz
+descr:          SEZNAM - II
+country:        CZ
+address:        Radlicka 3294/10 150 00 Prague 5 Czech Republic
+phone:          +420 602 126 570
+admin-c:        SZN5-RIPE
+admin-c:        PZ172-RIPE
+
+==============================-GEOLOCATION SERVER-==============================
+continent       Europe
+continentCode   EU
+country         Czechia
+countryCode     CZ
+region          10
+regionName      Hlavni mesto Praha
+city            Prague
+zip             150 00
+timezone        Europe/Prague
+currency        CZK
+isp             Seznam - II
+as              AS43037 Seznam.cz, a.s.
+asname          SEZNAM-CZ
+reverse         www.seznam.cz
+query           77.75.74.176
+\end{lstlisting}
+
+
+\begin{table}[h]
+	\label{dns_refer_4}
+	\centering
+	\begin{tabular}{|c|c|}
+		\hline
+		\textbf{Záznam} & \textbf{Výsledok dotazu} \\ \hline
+		A & \begin{tabular}[c]{@{}c@{}}
+				2a02:598:4444:1::1\\
+				2a02:598:3333:1::1\\
+                2a02:598:4444:1::2\\
+ 				2a02:598:3333:1::2\end{tabular} \\ \hline
+		AAAA & \begin{tabular}[c]{@{}c@{}}
+				77.75.75.172\\
+				77.75.74.172\\
+				77.75.75.176\\
+				77.75.74.176\end{tabular} \\ \hline
+		CNAME & - \\ \hline
+		SOA & - \\ \hline
+		NS & - \\ \hline
+		PTR & - \\ \hline
+		MX & - \\ \hline
+	\end{tabular}
+	\caption{Referenčné DNS dotazy nad doménov \textbf{www.seznam.cz}.}
+\end{table}
+
+\begin{lstlisting}[caption={Referenčný Whois dotaz nad doménov \textbf{www.seznam.cz}.},captionpos=b, label={whois_refer_4}]
+user@pc:~$ whois 147.229.9.23 #ip address from dig www.seznam.cz A
+...
+inetnum:        77.75.75.0 - 77.75.75.255
+netname:        SEZNAM-CZ
+descr:          Seznam.cz
+country:        CZ
+admin-c:        SZN5-RIPE
+tech-c:         SZN5-RIPE
+status:         ASSIGNED PA
+mnt-by:         SEZNAM-MNT
+created:        2007-06-20T11:44:33Z
+last-modified:  2007-06-20T11:44:33Z
+source:         RIPE
+
+role:           Seznam.cz IT department
+address:        Radlicka 3294/10 150 00 Prague 5 Czech Republic
+phone:          +420 602 126 570
+abuse-mailbox:  abuse@seznam.cz
+admin-c:        PZ172-RIPE
+tech-c:         SZN11-RIPE
+tech-c:         SZN10-RIPE
+nic-hdl:        SZN5-RIPE
+mnt-by:         SEZNAM-MNT
+created:        2007-05-06T15:50:27Z
+last-modified:  2015-07-03T13:19:00Z
+source:         RIPE # Filtered
+\end{lstlisting}
+
+\subsection{Experiment 5}\label{experiment_5}
+\begin{lstlisting}[caption={Výsledok dotazu nad doménov \textbf{vutbr.cz}.},captionpos=b, label={test_app_5}]
+user@pc:~$ ./isa-tazatel -q vutbr.cz -w whois.ripe.net
+==============================---------DNS--------==============================
+SOA:            origin rhino.cis.vutbr.cz
+SOA:			email hostmaster.vutbr.cz
+SOA:			serial 2019110200
+SOA:			refresh 28800
+SOA:			retry 7200
+SOA:			expire 1814400
+SOA:			minimum 1814400
+A:              147.229.2.90
+NS:             rhino.cis.vutbr.cz
+NS:             pipit.cis.vutbr.cz
+MX:             5 mx.vutbr.cz
+TXT:            "v=spf1 ip4:147.229.0.0/16 ip6:2001:67c:1220::/48 include:spf.protection.outlook.com include:_spf.google.com ~all"
+TXT:            "google-site-verification=kSdrjCE0ee5GKpv_Xtr-18k9Pm1OzRIVXrkm9kIwEAk"
+TXT:            "MS=ms21627876"
+
+==============================--------WHOIS-------==============================
+inetnum:        147.229.0.0 - 147.229.254.255
+netname:        VUTBRNET
+descr:          Brno University of Technology
+descr:          VUTBR-NET1
+country:        CZ
+address:        Brno University of Technology
+address:        Antoninska 1
+address:        601 90 Brno
+address:        The Czech Republic
+phone:          +420 541145453
+phone:          +420 723047787
+admin-c:        CA6319-RIPE
+
+==============================-GEOLOCATION SERVER-==============================
+continent       Europe
+continentCode   EU
+country         Czechia
+countryCode     CZ
+region          64
+regionName      South Moravian
+city            Brno
+zip             614 00
+timezone        Europe/Prague
+currency        CZK
+isp             VUTBR
+org             Brno University of Technology
+as              AS197451 Brno University of Technology
+asname          VUTBR-AS
+reverse         piranha.ro.vutbr.cz
+query           147.229.2.90
+\end{lstlisting}
 
 \end{document}
