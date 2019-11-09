@@ -49,16 +49,16 @@
 \newpage
 
 \section{Úvod}
-Doménové meno je jednoznačný identifikátor objektu (počítač, sieť a podobne) v Internete. Doménové meno môže poskytovať množstvo informácií o tomto objekte ako sú informácie o vlastníkovy, geografické vlastosti a podobne. Tieto informácie sa dajú získavať pomocou rôznych internetových protokolov. Tento manuál popisuje aplikáciu, ktorá získava takéto informácií pomocou internetových protokolov Domain Name System (DNS), Whois a taktiež pomocou geolokačných databáz.
+Doménové meno je jednoznačný identifikátor objektu (počítač, sieť a podobne) v Internete. Doménové meno môže poskytovať množstvo informácií o tomto objekte ako sú informácie o vlastníkovy, geografické informácie a podobne. Tieto informácie sa dajú získavať pomocou rôznych internetových protokolov. Tento manuál popisuje aplikáciu, ktorá získava takéto informácií pomocou internetových protokolov Domain Name System (DNS), Whois a taktiež pomocou geolokačnej databázy.
 
 \subsection{DNS protokol}
-Ako popisuje RFC 1034\cite{RFC1034}, štruktúra unikátneho pomenovania domén na internete sa v pribehu času vyvýjala na základe rôznych požiadaviek. Meno hostiteľa (anglicky hostname) spravoval systém Network Information Center (NIC). Systém nedostačoval vzhľadom na rapidný nárast počtu uživateľov. Aplikácie na internete boli stále sofistikovanejšie a potrebovali obecnejší systém. Výsledokom bol vznik Domain Name System (DNS). DNS je hierarchický a decentrlizovaný systém, ktorý spája meno hostiteľa s rôznymi informáciami, pričom najpodstatnejšou informáciou je Internet Protocol adresa (IP). Komunikáciu s DNS serverom definuje DNS protocol. DNS server poskytuje databázu do ktorej sa dá dotazovať a server poskytuje odpovede.
+Ako popisuje RFC 1034\cite{RFC1034}, štruktúra unikátneho pomenovania domén na internete sa v pribehu času vyvýjala na základe rôznych požiadaviek. Meno hostiteľa (anglicky hostname) spravoval systém Network Information Center (NIC). Systém nedostačoval vzhľadom na rapidný nárast počtu uživateľov. Aplikácie na internete boli stále sofistikovanejšie a potrebovali obecnejší systém. Výsledokom bol vznik Domain Name System (DNS). DNS je hierarchický a decentrlizovaný systém, ktorý spája meno hostiteľa s rôznymi informáciami, pričom najpodstatnejšou informáciou je Internet Protocol adresa (IP). DNS server poskytuje databázu do ktorej sa dá dotazovať a server poskytuje odpovede. Komunikáciu s DNS serverom definuje DNS protokol. 
 
 \subsection{Whois protokol}
 Pre viac podrobné informácie o doméne (detaily o vlastníkovy domény) existuje internetový protokol Whois\cite{RFC3912}. Systém umožnuje podobný dotaz/odpoveď servis.
 
 \subsection{Geolokačné databázy}
-Ďalšou možnosťou získania ešte podrobnejších informácií spojených s geografickou polohou objektu reprezentovaného pod doménovým menom je možnosť využiť geolokačné databázy. Tieto databázy spravujú rôzne spoločnosti, ktoré vlastnia  veľké množstvo geolokačných informácií. Spôsob ako datá získavajú nie je predmetom tejto práce.
+Ďalšou možnosťou získania ešte podrobnejších informácií spojených s geografickou polohou objektu reprezentovaného pod doménovým menom je možnosť využitia geolokačných databáz. Tieto databázy spravujú rôzne spoločnosti, ktoré vlastnia  veľké množstvo geolokačných informácií. Spôsob ako datá získavajú nie je predmetom tejto práce.
 
 \section{Architektúra a implementácia aplikácie}
 Program je implementovaný v C++ a používa funkcionalitu štandardnej knihovny. Ďalej pre vytváranie TCP socketov používa knihovnu BSD sockets a pre komunikáciu s DNS serverom používa knihovnu \texttt{<resolv.h>}. Architektúra aplikácie je rozdelená na niekoľko samostatných celkov (tried), ktoré sú popísané v tejto kapitole.
@@ -66,7 +66,7 @@ Program je implementovaný v C++ a používa funkcionalitu štandardnej knihovny
 \subsection{TCP socket} Umožnuje vytvárať TCP komunikáciu. TCP komunikáciu aplikácia využíva pri komunikácii s DNS serverom a taktiež pri komunikácii s geolokačnou databázou. Komponenta využíva pre TCP komunikáciu štandardné funkcie knihovny BSD sockets.
 \subsection{DNS query} Vytvára dotazy na DNS databázu. Pre vytváranie a prijímanie dotazov a odpovedí sa využíva funkcionalita z knihovny \texttt{resolv.h}. Aplikácia sa dotazuje na informácie, ktoré šadnardne obsahuje DNS protokol (A, AAAA, MX, CNAME, NS, SOA, TXT a PTR). Význam jednotlivých položiek v protokole je popísaný v RFC 1045\cite{RFC1035}. Komunikácia prebieha tak, že sa postupne aplikácia dotazuje na jednotlivé políčka a vyhodnocuje prijaté odpovede. Získané datá sa zobrazia uživateľovi.
 \subsection{Whois query} Vytvára dotazy na whois databázu a prijíma odpovede. Server na ktorý sú dotazy zasielané špecifikuje uživateľ. Dotaz zasiela ako TCP paket na server špecifikovaný uživateľom na port 43, na tomto porte beží služba hostiteľa Stanford Research Institute’s Network Information Center (SRI NIC\cite{RFC0954}). Whois server zašle odpoveď pomocou TCP komunikácie a táto komponenta ho zanalyzuje. Na rozdiel od DNS dotazovania, tu sa zašle jediný dotaz, ktorý obsahuje IP adresu analyzovanej domény a whois server zašle späť všetky jeho dostupné datá. Komponenda následne datá zanalyzuje, vyhodnotí a zobrazí ich uživateľovi.
-\subsection{Geolocation database} Umožnuje získavanie informácií z geolokačnej databázy \href{ip-api}{ip-api.com}. Ide o voľne dostupnú, neplatenú geolokačnú databázu, ktorú je momžné voľne využívať pre nekomerčné účely (viac viď. podmienky používania\cite{ip_api_terms}). S databázou sa komunikuje pomocou HTTP protokolu. Trieda vytvorí TCP paket s HTTP hlavičkou, ktorej url obsahuje dotazovanú IP adresu vo formáte definovanom aplikačným rozhraním tejto databázy. Databáza voľbu formátu odpovede, ktorú zašle späť (json, csv, xml). Trieda následne prijaté datá zanalyzuje a zobrazí uživateľovi.
+\subsection{Geolocation database} Umožnuje získavanie informácií z geolokačnej databázy \href{ip-api}{ip-api.com}. Ide o voľne dostupnú, neplatenú geolokačnú databázu, ktorú je momžné voľne využívať pre nekomerčné účely (viac viď. podmienky používania\cite{ip_api_terms}). Databáza je dostupná online a umožnuje komunikáciu pomocou HTTP protokolu. Trieda vytvorí TCP paket s HTTP hlavičkou, ktorej url obsahuje dotazovanú IP adresu vo formáte definovanom aplikačným rozhraním tejto databázy. V HTTP hlavičke sa defunuje taktiež formát v akom chceme prijať datá. Databáza následne zašle späť datá v požadovanom formáte (json, csv, xml). Trieda následne prijaté datá zanalyzuje a zobrazí uživateľovi.
 
 \section{Návod na použitie}
 Program je nativne vyvýjaný pre OS GNU/Linux (na Windows netestované). Preložiť program je možné priloženým \texttt{Makefile}. Program sa používa následovne: \texttt{isa-tazatel <arguments>}, pričom argumenty sú rozdelené na povinné a nepovinné.
@@ -79,8 +79,8 @@ Povinné argumenty:
 
 Nepovinné argumenty:
 \begin{itemize}
-	\item \texttt{-d <IP|hostname>} IP adresa alebo názov hostiteľa DNS server na ktorý budú zasielané dotazy. Ak nie je zadaný tak sa bude implicitne používaať adresa \texttt{1.1.1.1}.
-	\item \texttt{-h} - Nápoveda na používanie argumentov.
+	\item \texttt{-d <IP>} IP adresa DNS serveru na ktorý budú zasielané dotazy. Ak nie je argument zadaný tak sa bude implicitne používať DNS resolver v operačnom systéme.
+	\item \texttt{-h} - Zobrazí nápovedu na používanie programu.
 \end{itemize}
 
 
@@ -88,17 +88,18 @@ Nepovinné argumenty:
 
 Pre testovanie boli ako referenčný nástroj použité open source utility \href{https://linux.die.net/man/1/nslookup}{\textbf{nslookup}} , \href{https://linux.die.net/man/1/host}{\textbf{host}}, \href{https://linux.die.net/man/1/dig}{\textbf{dig}} a \href{https://linux.die.net/man/1/whois}{\textbf{whois}}. Pre overenie správnosti zasielaných paketov sa využil analyzátor sieťových protokolov \href{https://www.wireshark.org/}{\textbf{wireshark}} .
 
-Pre získanie referenčných dát z DNS serveru pre testovanú doménu sa využil nástroj \texttt{dig}, pomocou ktorej sa postupne dotazovalo na A, AAAA, MX, CNAME, NS, SOA a PTR. Výsledky dotazov sú zprehľadnené v tabuľke. Pre referenčné Whois datá sa použila utilita \texttt{whois} s atribútom IPv4 adresy analyzovanej domény. IP adresa bola získaná predchádzajúcim dotazom utilitou \texttt{dig}. Datá získané z referenčných nástrojov pre testované domény sú v prílohe 1. Datá získané touto aplikáciu pre rovnaké domény sú priložené v prílohe 2. 
-
-V rámci testovania sa experimentovalo s piatimi doménami. Testované domény a výsledky testov:
+Pre získanie referenčných dát z DNS serveru pre testovanú doménu sa využil nástroj \texttt{dig}, pomocou ktorej sa postupne dotazovalo na A, AAAA, MX, CNAME, NS, SOA a PTR. Výsledky dotazov sú zprehľadnené v sekcii s prílohami zvlášť pre každú testovanú doménu vo forme prehľadovej tabuľky. Pre referenčné Whois datá sa použila utilita \texttt{whois} s atribútom IPv4 adresy analyzovanej domény. IP adresa bola získaná predchádzajúcim dotazom utilitou \texttt{dig}. Datá získané z referenčných nástrojov pre testované domény a datá získané  aplikáciu \texttt{isa-tazatel} pre rovnaké domény sú priložené v prílohách. V rámci testovania sa experimentovalo s piatimi doménami. Testované domény a výsledky testov:
 \begin{itemize}
 	\item \textbf{www.youtube.com}: Výsledok DNS dotazov sa zhodoval. Výsledky whois dotazov sa nezhodovali lebo doména je spravovaná whois serverom \texttt{whois.arin.net} a mi sme zasielali dotaz na server \texttt{whois.ripe.net}. Výstup experimentu je v prílohe \ref{experiment_1}.
 	\item \textbf{www.netflix.com} Výsledok experimentu je veľmi podobný predchádzajúcemu. Výstup je v prílohe \ref{experiment_2}.
-	\item \textbf{www.fit.vutbr.cz} Výsledok DNS aj Whois zhodný ale keď že aplikácia neodchytáva všetky whois datá tak boli niektoré informácie oproti referenčnému nástroju zahodené. Výsledky experimentu sú v prílohe \ref{experiment_3}.
+	\item \textbf{www.fit.vutbr.cz} Výsledok DNS aj Whois zhodný ale keďže aplikácia neodchytáva všetky whois datá tak boli niektoré informácie oproti referenčnému nástroju zahodené. Výsledky experimentu sú v prílohe \ref{experiment_3}.
 	\item \textbf{www.seznam.cz} Výsledok experimentu je veľmi podobný predchádzajúcemu. Výstup je v prílohe  \ref{experiment_4}
 	\item \textbf{vutbr.cz} DNS server oproti predchádzajúcim experimentom poskytol viacej informácií ako len IP adresy. Inak je výsledok experimentu podobný predchádzajúcim. Výstup je v prílohe \ref{experiment_5}
 \end{itemize}
-Datá získané touto aplikáciu sa zhodovali s datami získanými z referenčných nástrojov (okrem whois dotazov u ktorých referenčný nástroj využil iný whois server). Avšak referenčné nástroje dokázali získať niektoré datá navyše, ktoré táto aplikácia nezískala. Informácie získané geolokačným serverom som neporovnával voči žiadnemu referenčnéu nástroju avšak zbežný pohľad do výstupov (napr. geograická adresa poskytnutá whois a geolokačným serverom) ukazuje na to, že informácie by mohli byť dôverihodné.
+Datá získané touto aplikáciu sa zhodovali s datami získanými z referenčných nástrojov (okrem whois dotazov u ktorých referenčný nástroj využil iný whois server). Avšak referenčné nástroje dokázali získať niektoré datá navyše, ktoré táto aplikácia nezískala. Informácie získané geolokačným serverom som neporovnával voči žiadnemu referenčnéu nástroju avšak zbežný pohľad do výstupov (napr. geografická adresa poskytnutá whois a geolokačným serverom) ukazuje na to, že informácie poskytované geolokačným serverom by mohli byť dôveryhodné.
+
+\section{Záver}
+Tento manuál popisuje aplikáciu na získavanie informácií o vlastníkoch internetových domén. Aplikácie vznikla ako školský projekt. V rámci vývoja som využíval rôzne open source utility, ktoré už túto funkcionalitu poskytujú. Priestor pre ďalšie rozšírenia vidím v implementácii získavania ďalších whois informácií, ktoré táto aplikácia oproti referenčným nástrojom neposkytuje. Ďalším možným rozšírením je dynamická voľba whois serveru. Aktuálne získané informácie získané z whois komunikácie sú závislé na servery, ktorý špecifikuje uživateľ. V rámci aplikácie som si vyskúšal implementáciu dotazov na DNS a Whois servery. Ako bonusové rozšírenie som naimplementoval získavanie dát z online geolokačnej databázy pomocou HTTP komunikácie. 
 
 \newpage
 \bibliographystyle{czechiso}
@@ -584,6 +585,74 @@ as              AS197451 Brno University of Technology
 asname          VUTBR-AS
 reverse         piranha.ro.vutbr.cz
 query           147.229.2.90
+\end{lstlisting}
+
+
+\begin{table}[h]
+	\label{dns_refer_5}
+	\centering
+	\begin{tabular}{|c|c|}
+		\hline
+		\textbf{Záznam} & \textbf{Výsledok dotazu} \\ \hline
+		A & 147.229.2.90 \\ \hline
+		AAAA & - \\ \hline
+		CNAME & - \\ \hline
+		SOA & \begin{tabular}[c]{@{}c@{}}
+			rhino.cis.vutbr.cz.\\
+			hostmaster.vutbr.cz.\\
+			2019110200 ; serial\\
+			28800      ; refresh (8 hours)\\
+			7200       ; retry (2 hours)\\
+			1814400    ; expire (3 weeks)\\
+			300        ; minimum (5 minutes)\end{tabular} \\ \hline
+		NS & \begin{tabular}[c]{@{}c@{}}
+			pipit.cis.vutbr.cz.\\
+			rhino.cis.vutbr.cz.\end{tabular} \\ \hline
+		PTR & - \\ \hline
+		MX & 5 mx.vutbr.cz. \\ \hline
+	\end{tabular}
+	\caption{Referenčné DNS dotazy nad doménov \textbf{vutbr.cz}.}
+\end{table}
+
+\begin{lstlisting}[caption={Referenčný Whois dotaz nad doménov \textbf{vutbr.cz}.},captionpos=b, label={whois_refer_5}]
+user@pc:~$ whois 147.229.2.90 #ip address from dig vutbr.cz A
+...
+inetnum:        147.229.0.0 - 147.229.254.255
+netname:        VUTBRNET
+descr:          Brno University of Technology
+country:        CZ
+admin-c:        CA6319-RIPE
+tech-c:         CA6319-RIPE
+status:         ASSIGNED PA
+mnt-by:         VUTBR-MNT
+created:        2014-11-19T08:23:45Z
+last-modified:  2015-01-30T08:37:07Z
+source:         RIPE
+
+role:           Brno University of Technology - Backbone Admins
+address:        Brno University of Technology
+address:        Antoninska 1
+address:        601 90 Brno
+address:        The Czech Republic
+phone:          +420 541145453
+phone:          +420 723047787
+nic-hdl:        CA6319-RIPE
+mnt-by:         VUT-BATCH-MNT
+mnt-by:         VUTBR-MNT
+created:        2015-01-30T08:31:35Z
+last-modified:  2016-11-04T14:01:52Z
+source:         RIPE # Filtered
+abuse-mailbox:  abuse@vutbr.cz
+
+% Information related to '147.229.0.0/17AS197451'
+
+route:          147.229.0.0/17
+descr:          VUTBR-NET1
+origin:         AS197451
+mnt-by:         VUTBR-MNT
+created:        2014-12-04T19:07:00Z
+last-modified:  2014-12-04T19:07:00Z
+source:         RIPE
 \end{lstlisting}
 
 \end{document}
